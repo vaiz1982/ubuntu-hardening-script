@@ -1,0 +1,25 @@
+# Personal files
+.bash_history
+.lesshst
+.sudo_as_admin_successful
+.cache/
+.ssh/
+.profile
+.bashrc
+.bash_logout
+
+# Logs and backups
+*.log
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# Script logs
+ubuntu_harden.log
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*~
