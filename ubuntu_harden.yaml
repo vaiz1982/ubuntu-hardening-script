@@ -1,0 +1,140 @@
+---
+- name: Ubuntu Safe Hardening Playbook
+  hosts: all
+  become: yes
+
+  vars:
+    ssh_port: 22
+    allow_password_auth: false
+
+  tasks:
+
+  # =====================
+  # SYSTEM UPDATE
+  # =====================
+  - name: Update apt cache
+    apt:
+      update_cache: yes
+
+  - name: Upgrade packages
+    apt:
+      upgrade: dist
+
+  # =====================
+  # SSH HARDENING (SAFE)
+  # =====================
+  - name: Backup sshd_config
+    copy:
+      src: /etc/ssh/sshd_config
+      dest: /etc/ssh/sshd_config.bak
+      remote_src: yes
+
+  - name: Set SSH port
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^#?Port'
+      line: "Port {{ ssh_port }}"
+
+  - name: Disable root login
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^#?PermitRootLogin'
+      line: "PermitRootLogin no"
+
+  - name: Enable public key auth
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^#?PubkeyAuthentication'
+      line: "PubkeyAuthentication yes"
+
+  - name: Password authentication toggle
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^#?PasswordAuthentication'
+      line: "PasswordAuthentication {{ 'yes' if allow_password_auth else 'no' }}"
+
+  - name: Disable empty passwords
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^#?PermitEmptyPasswords'
+      line: "PermitEmptyPasswords no"
+
+  - name: Restart SSH
+    service:
+      name: ssh
+      state: restarted
+
+  # =====================
+  # FIREWALL (UFW)
+  # =====================
+  - name: Install UFW
+    apt:
+      name: ufw
+      state: present
+
+  - name: Allow SSH
+    ufw:
+      rule: allow
+      port: "{{ ssh_port }}"
+      proto: tcp
+
+  - name: Enable UFW
+    ufw:
+      state: enabled
+      policy: deny
+      direction: incoming
+
+  # =====================
+  # PASSWORD POLICY (SAFE VERSION)
+  # =====================
+  - name: Install pwquality
+    apt:
+      name: libpam-pwquality
+      state: present
+
+  - name: Configure password policy
+    blockinfile:
+      path: /etc/security/pwquality.conf
+      block: |
+        minlen = 12
+        minclass = 3
+        maxrepeat = 2
+        maxsequence = 3
+        maxclassrepeat = 2
+
+  # =====================
+  # FAIL2BAN
+  # =====================
+  - name: Install fail2ban
+    apt:
+      name: fail2ban
+      state: present
+
+  - name: Enable SSH protection in fail2ban
+    copy:
+      dest: /etc/fail2ban/jail.local
+      content: |
+        [sshd]
+        enabled = true
+        maxretry = 3
+        bantime = 3600
+
+  - name: Restart fail2ban
+    service:
+      name: fail2ban
+      state: restarted
+
+  # =====================
+  # SECURITY UPDATES
+  # =====================
+  - name: Install unattended upgrades
+    apt:
+      name: unattended-upgrades
+      state: present
+
+  - name: Enable unattended upgrades
+    copy:
+      dest: /etc/apt/apt.conf.d/20auto-upgrades
+      content: |
+        APT::Periodic::Update-Package-Lists "1";
+        APT::Periodic::Unattended-Upgrade "1";
