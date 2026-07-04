@@ -1,3 +1,7 @@
+ansible-playbook -i inventory <###>
+
+
+
 # Ubuntu Hardening Script
 
 A comprehensive bash script for hardening Ubuntu servers.
